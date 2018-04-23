@@ -3,7 +3,8 @@ from urllib.parse import urlencode
 import hmac
 import hashlib
 import datetime
-from random import randint 
+
+from db.security import IncrementOnlyNonce
 
 class YobitApi:
     API_URL = None
@@ -149,8 +150,7 @@ class TradeApi(YobitApi):
         self.USE_CLOUDFLARE_SCRAPE = use_cloudflare_scrape
 
     def _get_headers(self, data: dict):
-        data['nonce'] = str(int(datetime.datetime.now().timestamp()))+str(randint(10000000000, 99999999999))
-
+        data['nonce'] = str(IncrementOnlyNonce.get_nonce('yobit'))
         sign = hmac.new(
             self.secret_key.encode(),
             urlencode(data).encode(),
