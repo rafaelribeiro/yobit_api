@@ -5,11 +5,62 @@ import hashlib
 import datetime
 
 from db.security import IncrementOnlyNonce
+from requests.exceptions import RequestException
+
+from time import time, sleep
+from itertools import chain as _chain
+from functools import wraps as _wraps
+
+retryDelays = (0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 7)
+
+class YobitError(Exception):
+    """ Exception for handling cryptopia api errors """
+    pass
+
+class NonceException(YobitError):
+    """ Exception for handling nonce errors """
+    pass
+
+class RetryException(YobitError):
+    """ Exception for retry decorator """
+    pass
+
+class ServiceUnavailableException(YobitError):
+    """ Exception for handling 503 responses """
+    pass
+
+def _retry(func):
+    """ retry decorator """
+    @_wraps(func)
+    def retrying(self, *args, **kwargs):
+        problems = []
+        for delay in _chain(retryDelays, [None]):
+            try:
+                # attempt call
+                return func(self, *args, **kwargs)
+
+            # we need to try again
+            except (RequestException, NonceException) as problem:
+                problems.append(problem)
+                
+                # update headers with new nonce
+                kwargs['headers'] = self._get_headers(kwargs['data'])
+                if delay is None:
+                    # logger.debug(problems)
+                    raise RetryException(
+                        'retryDelays exhausted ' + str(problem))
+                else:
+                    # log exception and wait
+                    # logger.debug(problem)
+                    # logger.info("-- delaying for %ds", delay)
+                    sleep(delay)
+    return retrying
 
 class YobitApi:
     API_URL = None
     USE_CLOUDFLARE_SCRAPE = True
 
+    @_retry
     def _make_request(self, method_name: str = None, method: str = 'get', params: dict = None, data: dict = None,
                       headers: dict = None, url_number: int = 0, use_cloudflare_scrape: bool = False):
         """
@@ -44,9 +95,13 @@ class YobitApi:
         elif str(res['status_code'])[:2] == '50' and self.USE_CLOUDFLARE_SCRAPE is True:
             return self._make_request(method_name, method, params, data, headers, url_number,
                                       use_cloudflare_scrape=True)
-        else:
-            return res
-
+        error = res['result'].get('error')
+        if error:
+            if 'invalid nonce' in error:
+                print('vai dar merda ({})'.format(error))
+                raise NonceException(error)
+            
+        return res
 
 class PublicApi(YobitApi):
     API_URL = [
@@ -150,7 +205,7 @@ class TradeApi(YobitApi):
         self.USE_CLOUDFLARE_SCRAPE = use_cloudflare_scrape
 
     def _get_headers(self, data: dict):
-        data['nonce'] = str(IncrementOnlyNonce.get_nonce('yobit'))
+        data['nonce'] = str(int(datetime.datetime.now().timestamp()))
         sign = hmac.new(
             self.secret_key.encode(),
             urlencode(data).encode(),
