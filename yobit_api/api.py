@@ -6,6 +6,7 @@ import datetime
 
 from db.security import IncrementOnlyNonce
 from requests.exceptions import RequestException
+from apiexceptions import DdosBlockedException
 
 from time import time, sleep
 from itertools import chain as _chain
@@ -97,8 +98,11 @@ class YobitApi:
                                       use_cloudflare_scrape=True)
         error = res['result'].get('error')
         if error:
+            if type(error) == bytes:
+                raise DdosBlockedException('ip bloqueado por suspeita de ataque ddos', 'yobit', data)
+
             if 'invalid nonce' in error:
-                print('vai dar merda ({})'.format(error))
+                print('yobit ({})'.format(error))
                 raise NonceException(error)
             
         return res
