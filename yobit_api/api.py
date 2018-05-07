@@ -7,6 +7,7 @@ import datetime
 from db.security import IncrementOnlyNonce
 from requests.exceptions import RequestException
 from apiexceptions import DdosBlockedException
+from json.decoder import JSONDecodeError
 
 from time import time, sleep
 from itertools import chain as _chain
@@ -41,7 +42,7 @@ def _retry(func):
                 return func(self, *args, **kwargs)
 
             # we need to try again
-            except (RequestException, NonceException) as problem:
+            except (RequestException, NonceException, JSONDecodeError) as problem:
                 problems.append(problem)
                 
                 # update headers with new nonce
