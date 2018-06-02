@@ -46,7 +46,7 @@ def _retry(func):
                 problems.append(problem)
                 
                 # update headers with new nonce
-                kwargs['headers'] = self._get_headers(kwargs.get('data'), {})
+                kwargs['headers'] = self._get_headers(kwargs.get('data', {}))
                 if delay is None:
                     # logger.debug(problems)
                     raise RetryException(
