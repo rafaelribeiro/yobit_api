@@ -339,10 +339,10 @@ class TradeApi(YobitApi):
             "from": start,
             "count": count,
             "from_id": from_id,
-            "end_id": end_id,
+            "end_id": end_id if end_id else '',
             "order": order,
             "since": start_time,
-            "end": end_time,
+            "end": end_time if end_time else '',
         }
 
         return self._make_request(method="post", data=data, headers=self._get_headers(data)).get("result")
